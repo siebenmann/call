@@ -9,9 +9,6 @@ to stdout. If it sees EOF on stdin, it tells the network connection
 that no more data will be coming; if it reads EOF on the network
 connection, it stops.
 
-Note that this requires a development version of Go because it uses
-a Unix socket function that's not present in Go 1.0.
-
 Disclaimer: this is the author's first Go program. It likely shows.
 
 The program has a bunch of comments at the start of call.go to

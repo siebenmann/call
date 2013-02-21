@@ -5,9 +5,6 @@
 // We can optionally listen for connections instead and then converse with
 // with them. This gets complex for UDP (and Unix datagram); see later.
 //
-// NOTE: this requires a development Go version because
-// UnixConn.CloseWrite() is not in Go 1.0.
-//
 // usage: call [-lPHRqh] [-C NUM] [proto] {address | host port}
 // Note that you have to specify arguments separately. Sigh.
 // -h: show brief usage
@@ -150,20 +147,14 @@ func fromnet(remote net.Conn, master chan shutdowns) {
 
 // Do CloseWrite() aka shutdown(fd, 1) on conn if possible.
 // Return true if we could, false otherwise.
-//
-// My irritation at this function is massive.
-// I am almost tempted to do a bit of panic/rescue magic here with
-// interface conversions.
-//
-// (The irritation is extra-intense since Go 1.0 doesn't have
-// UnixConn.CloseWrite().)
+type Closer interface {
+	CloseRead() error
+	CloseWrite() error
+}
 func shutdown_write(conn net.Conn) bool {
-	switch i := conn.(type) {
-	case *net.TCPConn:
-		i.CloseWrite()
-		return true
-	case *net.UnixConn:
-		i.CloseWrite()
+	v, ok := conn.(Closer)
+	if ok {
+		v.CloseWrite()
 		return true
 	}
 	return false

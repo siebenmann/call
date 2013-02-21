@@ -12,6 +12,8 @@ connection, it stops.
 Note that this requires a development version of Go because it uses
 a Unix socket function that's not present in Go 1.0.
 
+Disclaimer: this is the author's first Go program. It likely shows.
+
 The program has a bunch of comments at the start of call.go to
 describe its usage. However, they are somewhat terse, so here's some
 additional commentary.

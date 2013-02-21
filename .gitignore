@@ -1,0 +1,5 @@
+*~
+# ignore compiled versions
+call
+call32
+call64

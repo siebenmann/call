@@ -1,0 +1,127 @@
+== What it is:
+
+call.go is more or less a Go version of netcat. It was written partly
+because Chris Siebenmann felt like it and partly because he overlooked
+the -U option to netcat (and needed something that talked to Unix
+sockets). You probably want to use netcat instead. In short, it makes
+network connections then copies stdin to the network and the network
+to stdout. If it sees EOF on stdin, it tells the network connection
+that no more data will be coming; if it reads EOF on the network
+connection, it stops.
+
+Note that this requires a development version of Go because it uses
+a Unix socket function that's not present in Go 1.0.
+
+The program has a bunch of comments at the start of call.go to
+describe its usage. However, they are somewhat terse, so here's some
+additional commentary.
+
+usage: call [args] [proto] {address | host port}
+
+Although the comments show [args] in the traditional Unix form,
+call.go doesn't accept them that way; you must give each flag
+separately. You may thank Go's standard argument parsing module
+for this.
+
+proto is the protocol to use and is derived from the protocol names
+used by Go's net package. Supported protocols:
+
+	tcp4, tcp6, udp4 and udp6 are IPv4 and IPv6 TCP and UDP.
+	tcp and udp are the generalized versions; they mean to try
+	both IPv4 and IPv6 if possible.
+
+	ssl/tls are TLS without certificate verification
+	sslver/tlsver are TLS with certificate verification
+
+	unix is (stream) Unix domain sockets; the address is the
+	socket file name.
+	unixpacket is Unix SOCK_SEQPACKET sockets; they basically
+	act like stream sockets.
+	unixgram is datagram Unix domain sockets. They work so-so.
+
+The default protocol is 'tcp'.
+
+All of the SSL/TLS options use 'tcp' as the underlying protocol, so
+they will try to make both IPv6 and IPv4 connections if warranted and
+possible.
+
+For IP protocols, address is 'host:port' where the host is optional.
+For connecting to things, a missing host (':port') means localhost;
+for listening for connections, a missing host means (normal)
+wildcarded listening. host may be a hostname or an IPv4/IPv6 address
+(the latter written as '[::1]' and so on). port may be a number or a
+port name.
+
+When given only two arguments, the usage is ambiguous: you could be
+doing 'call proto address' or 'call host port'. call decides which it
+is based on whether or not the first argument is a known and valid
+protocol, which means that a typo can get odd error messages. For
+example:
+
+	$ call tcp7 :ssh
+	call: error dialing tcp!tcp7::ssh: too many colons in address tcp7::ssh
+
+Someday it may notice that a : in the second argument is a warning
+sign, but for now it's already trying enough odd things in the two
+argument case.
+
+=== options cross-reference
+
+Usage of ./call:
+  -C=0: if non-zero, only listen for this many connections then exit
+  -H=false: print received datagrams as hex bytes
+  -P=false: just print our known protocols
+  -R=false: only receive datagrams, do not try to send stdin
+  -l=false: listen for connections instead of make them
+  -q=false: be quieter in some situations
+
+-P preempts (and ignores) all other options.
+
+The following options only affect -l: -C NUM, -H, -R. -H and -R only
+affect -l for datagram sockets, not for stream sockets (although -H
+may work with stream sockets someday). -C NUM only works with stream
+sockets, since datagram sockets don't really have a connection count.
+
+-l doesn't work for TLS and probably never will since that would
+require the addition of even more options to specify key, certificate,
+certificate chains and augh augh no. call.go already has too many
+options as it is.
+
+=== -l oddities
+
+-l puts call.go into 'listen' mode, where instead of making a
+connection to a server it tries to act as one. It is not entirely good
+at this and there are a number of oddities that result. It is better
+for stream socket protocols than for datagram protocols.
+
+As a server for stream socket protocols call.go listens for
+connections, accepts one, and then goes into its normal conversational
+mode except that it is EOF on standard input that ends the
+conversation, instead of EOF from the network; EOF from the network
+just prints a message so you know. If you EOF the connection without
+the other end having sent a network EOF first, call will often print:
+	call: network read error: read <blah>: use of closed network connection
+
+This is an unavoidable artifact of Go networking.
+
+It is less clear what having a conversation as a server means when
+we're dealing with datagram packets, where various clients can send us
+packets out of the blue. call opts to take a vaguely useful approach:
+if it's not already copying standard input to somewhere and it gets a
+packet, it starts copying standard input to the source of that packet
+(up until EOF). If you have a single client sending UDP packets, this
+is roughly equivalent to a stream socket.
+
+(This is how 'nc -lu' behaves for one connection, but the mechanics
+are different. nc connect()s its UDP socket and then write()s to it;
+call leaves its UDP socket unconnected and uses sendto(). Aren't you
+glad you asked? Also, this difference is forced by Go's networking
+package.)
+
+=== Author:
+
+Chris Siebenmann
+https://github.com/siebenmann/call.go
+http://utcc.utoronto.ca/~cks/space/blog/
+
+(and elsewhere)

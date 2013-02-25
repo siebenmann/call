@@ -147,13 +147,14 @@ func fromnet(remote net.Conn, master chan shutdowns) {
 
 // Do CloseWrite() aka shutdown(fd, 1) on conn if possible.
 // Return true if we could, false otherwise.
+// See http://utcc.utoronto.ca/~cks/space/blog/programming/GoInterfacePunning
+// for an explanation of how this works.
 type Closer interface {
 	CloseRead() error
 	CloseWrite() error
 }
 func shutdown_write(conn net.Conn) bool {
-	v, ok := conn.(Closer)
-	if ok {
+	if v, ok := conn.(Closer); ok {
 		v.CloseWrite()
 		return true
 	}

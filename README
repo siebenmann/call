@@ -54,15 +54,7 @@ port name.
 When given only two arguments, the usage is ambiguous: you could be
 doing 'call proto address' or 'call host port'. call decides which it
 is based on whether or not the first argument is a known and valid
-protocol, which means that a typo can get odd error messages. For
-example:
-
-	$ call tcp7 :ssh
-	call: error dialing tcp!tcp7::ssh: too many colons in address tcp7::ssh
-
-Someday it may notice that a : in the second argument is a warning
-sign, but for now it's already trying enough odd things in the two
-argument case.
+protocol or whether or not the second argument contains a ':'.
 
 === options cross-reference
 

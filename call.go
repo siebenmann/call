@@ -52,6 +52,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 )
 
 // an enum, basically.
@@ -65,8 +66,8 @@ const (
 // The datagram buffer size is deliberately large.
 // TODO: should we just make the stream buffer size large as well?
 const (
-	DGRAMBUF = (64*1024)
-	STREAMBUF = (8*1024)
+	DGRAMBUF  = (64 * 1024)
+	STREAMBUF = (8 * 1024)
 )
 
 // These should probably be using the log package, or be replaced by it.
@@ -214,7 +215,7 @@ func packet_recv(conn net.PacketConn, master chan net.Addr) {
 	buf := make([]byte, DGRAMBUF)
 	for {
 		var bufStr string
-		
+
 		n, addr, err := conn.ReadFrom(buf[0:])
 		if err != nil {
 			warnln("error on ReadFrom:", err)
@@ -437,11 +438,12 @@ func main() {
 			warnf("protocol %s is not supported\n", pt)
 			return
 		}
-		
-		// If arg[0] is a known protocol, arg[1] must be in
-		// address form. Otherwise we assume we have a two-argument
-		// 'host port' thing.
-		if isknownproto(flag.Arg(0)) {
+
+		// If arg[0] is a known protocol or arg[1] contains a :
+		// we assume that we have 'proto address'; otherwise we
+		// assume we have a two-argument 'host port' thing.
+		if isknownproto(flag.Arg(0)) ||
+		   strings.Contains(flag.Arg(1), ":") {
 			proto = flag.Arg(0)
 			addr = flag.Arg(1)
 		} else {

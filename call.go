@@ -5,11 +5,14 @@
 // We can optionally listen for connections instead and then converse with
 // with them. This gets complex for UDP (and Unix datagram); see later.
 //
-// usage: call [-lPHRqh] [-C NUM] [proto] {address | host port}
+// usage: call [-lPHRqh] [-b address] [-C NUM] [proto] {address | host port}
 // Note that you have to specify arguments separately. Sigh.
 // -h: show brief usage
 // -P means list known protocols with some information.
 // -q means to be quieter in some situations.
+// -b means to use the address as the local address. Doesn't apply to -l.
+//    For TCP and UDP, if the address lacks a ':' it's assumed to be a
+//    hostname or IP address.
 // -l means listen as a server. This behaves differently for stream and
 //    datagram protocols and does not support TLS/SSL (yet).
 // -C NUM means only listen for NUM connections during -l, then exit.
@@ -53,6 +56,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"errors"
 )
 
 // an enum, basically.
@@ -339,9 +343,30 @@ func listen(proto, addr string) {
 // ---
 // Client side conversation in general
 
+// BUG: This should be in the net package, not here.
+func ResolveAddr(proto, addr string) (net.Addr, error) {
+	switch proto {
+	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6":
+		if !strings.Contains(addr, ":") {
+			addr = addr + ":"
+		}
+	}
+	switch proto {
+	case "tcp", "tcp4", "tcp6":
+		return net.ResolveTCPAddr(proto, addr)
+	case "udp", "udp4", "udp6":
+		return net.ResolveUDPAddr(proto, addr)
+	case "ip", "ip4", "ip6":
+		return net.ResolveIPAddr(proto, addr)
+	case "unix", "unixpacket", "unixgram":
+		return net.ResolveUnixAddr(proto, addr)
+	}
+	return nil, errors.New("cannot resolve address for protocol: "+proto)
+}
+		
 // We accept 'ssl'/'tls' as a protocol; it implies 'tcp' as the underlying
 // protocol.
-func dial(proto, addr string) (net.Conn, error) {
+func dial(proto, addr, laddr string) (net.Conn, error) {
 	switch proto {
 	case "ssl", "tls":
 		// For testing I do not want to have to verify anything
@@ -352,11 +377,18 @@ func dial(proto, addr string) (net.Conn, error) {
 	case "sslver", "tlsver":
 		return tls.Dial("tcp", addr, nil)
 	}
+	if laddr != "" {
+		a, e := ResolveAddr(proto, laddr)
+		if e != nil {
+			return nil, e
+		}
+		return net.DialOpt(addr, net.Network(proto), net.LocalAddress(a))
+	}
 	return net.Dial(proto, addr)
 }
 
-func call(proto, addr string) {
-	conn, err := dial(proto, addr)
+func call(proto, addr, laddr string) {
+	conn, err := dial(proto, addr, laddr)
 	if err != nil {
 		warnf("error dialing %s!%s: %s\n", proto, addr, err)
 		return
@@ -403,13 +435,14 @@ func listprotos() {
 //
 func main() {
 	proto := "tcp"
-	var addr string
+	var addr, laddr string
 	var lstn *bool = flag.Bool("l", false, "listen for connections instead of make them")
 	var pprotos *bool = flag.Bool("P", false, "just print our known protocols")
 	flag.BoolVar(&quiet, "q", false, "be quieter in some situations")
 	flag.IntVar(&conns, "C", 0, "if non-zero, only listen for this many connections then exit")
 	flag.BoolVar(&dgramhex, "H", false, "print received datagrams as hex bytes")
 	flag.BoolVar(&recvonly, "R", false, "only receive datagrams, do not try to send stdin")
+	flag.StringVar(&laddr, "b", "", "make the call from this local address")
 
 	flag.Parse()
 
@@ -420,7 +453,7 @@ func main() {
 
 	switch narg := flag.NArg(); {
 	case narg > 3 || narg == 0:
-		fmt.Fprintln(os.Stderr, "usage: call [-lPHRqh] [-C NUM] [proto] {address | host port}")
+		fmt.Fprintln(os.Stderr, "usage: call [-lPHRqh] [-b address] [-C NUM] [proto] {address | host port}")
 		fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
 		fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
 		return
@@ -479,6 +512,6 @@ func main() {
 		// protocols; net.Dial() makes it all work.
 		// (Don't ask me how unixgram works one way and not the
 		// other.)
-		call(proto, addr)
+		call(proto, addr, laddr)
 	}
 }

@@ -9,6 +9,11 @@ to stdout. If it sees EOF on stdin, it tells the network connection
 that no more data will be coming; if it reads EOF on the network
 connection, it stops.
 
+This now requires Go 1.1 because it uses the new net.DialOpt()
+interface to allow specifying the local address for an outgoing network
+connection. An older version only requires Go 1.0 (but works better on
+Go 1.1).
+
 Disclaimer: this is the author's first Go program. It likely shows.
 
 The program has a bunch of comments at the start of call.go to
@@ -63,10 +68,16 @@ Usage of ./call:
   -H=false: print received datagrams as hex bytes
   -P=false: just print our known protocols
   -R=false: only receive datagrams, do not try to send stdin
+  -b="": make the call from this local address
   -l=false: listen for connections instead of make them
   -q=false: be quieter in some situations
 
 -P preempts (and ignores) all other options.
+
+-b only works in non-l mode. It sets the local address for the
+outgoing call. For TCP and UDP protocols the full version is
+'host:port'; if there is no :, call infers that it is a hostname
+and supplies a trailing ':' (which means 'this host, any port').
 
 The following options only affect -l: -C NUM, -H, -R. -H and -R only
 affect -l for datagram sockets, not for stream sockets (although -H

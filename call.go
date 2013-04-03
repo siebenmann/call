@@ -382,7 +382,8 @@ func dial(proto, addr, laddr string) (net.Conn, error) {
 		if e != nil {
 			return nil, e
 		}
-		return net.DialOpt(addr, net.Network(proto), net.LocalAddress(a))
+		t := &net.Dialer{LocalAddr: a}
+		return t.Dial(proto, addr)
 	}
 	return net.Dial(proto, addr)
 }

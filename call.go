@@ -10,6 +10,7 @@
 // -h: show brief usage
 // -P means list known protocols with some information.
 // -q means to be quieter in some situations.
+// -v means to be more verbose in some situations.
 // -b means to use the address as the local address. Doesn't apply to -l.
 //    For TCP and UDP, if the address lacks a ':' it's assumed to be a
 //    hostname or IP address.
@@ -90,6 +91,7 @@ func warnln(elems ...interface{}) {
 // ---
 // Global options
 var quiet bool    // -q
+var verbose bool  // -v
 var dgramhex bool // -H
 var recvonly bool // -R
 var conns int     // -C NUM, 0 is 'not enabled'
@@ -394,6 +396,11 @@ func call(proto, addr, laddr string) {
 		warnf("error dialing %s!%s: %s\n", proto, addr, err)
 		return
 	}
+	if verbose {
+		warnf("connected to %s %s (%s):\n", proto, addr,
+			conn.RemoteAddr())
+	}
+		
 	converse(conn, false)
 }
 
@@ -440,6 +447,7 @@ func main() {
 	var lstn *bool = flag.Bool("l", false, "listen for connections instead of make them")
 	var pprotos *bool = flag.Bool("P", false, "just print our known protocols")
 	flag.BoolVar(&quiet, "q", false, "be quieter in some situations")
+	flag.BoolVar(&verbose, "v", false, "be more verbose in some situations")
 	flag.IntVar(&conns, "C", 0, "if non-zero, only listen for this many connections then exit")
 	flag.BoolVar(&dgramhex, "H", false, "print received datagrams as hex bytes")
 	flag.BoolVar(&recvonly, "R", false, "only receive datagrams, do not try to send stdin")

@@ -71,8 +71,13 @@ Usage of ./call:
   -b="": make the call from this local address
   -l=false: listen for connections instead of make them
   -q=false: be quieter in some situations
+  -v=false: be more verbose in some situations
 
 -P preempts (and ignores) all other options.
+
+-v makes call report when it has successfully connected to a remote
+server (and what the actual remote address is). This is obviously only
+really meaningful for connection-oriented protocols.
 
 -b only works in non-l mode. It sets the local address for the
 outgoing call. For TCP and UDP protocols the full version is

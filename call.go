@@ -308,8 +308,8 @@ func listenpacket(proto, addr string) {
 		}
 		fmt.Println("call: stdin EOF, send to", addr, "done.")
 	}
-	// We never exit the for loop, so this will never be executed:
-	conn.Close()
+	// We never reach here so calling conn.Close() here is unreachable
+	// code.
 }
 
 // ---

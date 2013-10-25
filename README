@@ -64,6 +64,7 @@ protocol or whether or not the second argument contains a ':'.
 === options cross-reference
 
 Usage of ./call:
+  -B=65536: the buffer size for (network) IO; important for 10G Ethernet
   -C=0: if non-zero, only listen for this many connections then exit
   -H=false: print received datagrams as hex bytes
   -P=false: just print our known protocols

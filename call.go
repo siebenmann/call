@@ -5,7 +5,7 @@
 // We can optionally listen for connections instead and then converse with
 // with them. This gets complex for UDP (and Unix datagram); see later.
 //
-// usage: call [-lPHRqh] [-b address] [-C NUM] [proto] {address | host port}
+// usage: call [-lPHRqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}
 // Note that you have to specify arguments separately. Sigh.
 // -h: show brief usage
 // -P means list known protocols with some information.
@@ -17,6 +17,7 @@
 // -l means listen as a server. This behaves differently for stream and
 //    datagram protocols and does not support TLS/SSL (yet).
 // -C NUM means only listen for NUM connections during -l, then exit.
+// -B BYTES sets the buffer size for (network) IO; important for 10G Ethernet
 // -H prints datagram data in hex when in -l.
 // -R simply receives datagram data when in -l.
 // [proto] is a protocol supported by the go net package plus some other
@@ -68,12 +69,8 @@ const (
 	writeShutdown
 )
 
-// The datagram buffer size is deliberately large.
-// TODO: should we just make the stream buffer size large as well?
-const (
-	DGRAMBUF  = (64 * 1024)
-	STREAMBUF = (8 * 1024)
-)
+// Default network buffer size
+const DEFAULTNETBUF  = (64 * 1024)
 
 // These should probably be using the log package, or be replaced by it.
 
@@ -95,6 +92,7 @@ var verbose bool  // -v
 var dgramhex bool // -H
 var recvonly bool // -R
 var conns int     // -C NUM, 0 is 'not enabled'
+var bufsize int   // -B bufsize, default is 64k
 
 // ---
 // Stream socket conversation support routines.
@@ -120,7 +118,7 @@ func writeall(dst io.Writer, buf []byte) (err error) {
 // something happens. No error message is printed for EOF on src.
 func fromto(src io.Reader, dst io.Writer, imsg, omsg string) {
 	var rerr, werr error
-	buf := make([]byte, STREAMBUF)
+	buf := make([]byte, bufsize)
 
 	for rerr == nil && werr == nil {
 		var n int
@@ -218,7 +216,7 @@ func converse(conn net.Conn, server bool) {
 // The data packets are assumed to have embedded newlines, which may be
 // false.
 func packet_recv(conn net.PacketConn, master chan net.Addr) {
-	buf := make([]byte, DGRAMBUF)
+	buf := make([]byte, bufsize)
 	for {
 		var bufStr string
 
@@ -253,7 +251,7 @@ func packet_recv(conn net.PacketConn, master chan net.Addr) {
 // unwritten data; this is basically required by packet-based connection
 // types, since two packets != one big packet.
 func packet_send(conn net.PacketConn, addr net.Addr, master chan shutdowns) {
-	buf := make([]byte, DGRAMBUF)
+	buf := make([]byte, bufsize)
 	for {
 		nr, err := os.Stdin.Read(buf[0:])
 		if err != nil {
@@ -452,6 +450,7 @@ func main() {
 	flag.BoolVar(&dgramhex, "H", false, "print received datagrams as hex bytes")
 	flag.BoolVar(&recvonly, "R", false, "only receive datagrams, do not try to send stdin")
 	flag.StringVar(&laddr, "b", "", "make the call from this local address")
+	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO; important for 10G Ethernet")
 
 	flag.Parse()
 
@@ -462,7 +461,7 @@ func main() {
 
 	switch narg := flag.NArg(); {
 	case narg > 3 || narg == 0:
-		fmt.Fprintln(os.Stderr, "usage: call [-lPHRqh] [-b address] [-C NUM] [proto] {address | host port}")
+		fmt.Fprintln(os.Stderr, "usage: call [-lPHRqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}")
 		fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
 		fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
 		return

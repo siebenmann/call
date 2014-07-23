@@ -52,13 +52,13 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"strings"
-	"errors"
 )
 
 // an enum, basically.
@@ -70,7 +70,7 @@ const (
 )
 
 // Default network buffer size
-const DEFAULTNETBUF  = (128 * 1024)
+const DEFAULTNETBUF = (128 * 1024)
 
 // These should probably be using the log package, or be replaced by it.
 
@@ -150,15 +150,18 @@ func fromnet(remote net.Conn, master chan shutdowns) {
 	master <- writeShutdown
 }
 
-// Do CloseWrite() aka shutdown(fd, 1) on conn if possible.
+// Do CloseWrite() aka shutdown(fd, 1) on conn if possible; we exploit
+// interfaces to do this relatively generically.
 // Return true if we could, false otherwise.
 // See http://utcc.utoronto.ca/~cks/space/blog/programming/GoInterfacePunning
 // for an explanation of how this works.
+
 type Closer interface {
 	CloseRead() error
 	CloseWrite() error
 }
-func shutdown_write(conn net.Conn) bool {
+
+func shutdownWrite(conn net.Conn) bool {
 	if v, ok := conn.(Closer); ok {
 		v.CloseWrite()
 		return true
@@ -183,7 +186,7 @@ func converse(conn net.Conn, server bool) {
 			// thing to do now is to exit.
 			// ... or at least the convenient thing, as far
 			// as Chris is concerned.
-			if !shutdown_write(conn) || server {
+			if !shutdownWrite(conn) || server {
 				break
 			}
 		} else {
@@ -215,7 +218,7 @@ func converse(conn net.Conn, server bool) {
 // of each packet upstream to our master.
 // The data packets are assumed to have embedded newlines, which may be
 // false.
-func packet_recv(conn net.PacketConn, master chan net.Addr) {
+func packetRecv(conn net.PacketConn, master chan net.Addr) {
 	buf := make([]byte, bufsize)
 	for {
 		var bufStr string
@@ -250,7 +253,7 @@ func packet_recv(conn net.PacketConn, master chan net.Addr) {
 // If we experience a short write, we just warn about it and discard the
 // unwritten data; this is basically required by packet-based connection
 // types, since two packets != one big packet.
-func packet_send(conn net.PacketConn, addr net.Addr, master chan shutdowns) {
+func packetSend(conn net.PacketConn, addr net.Addr, master chan shutdowns) {
 	buf := make([]byte, bufsize)
 	for {
 		nr, err := os.Stdin.Read(buf[0:])
@@ -285,19 +288,19 @@ func listenpacket(proto, addr string) {
 
 	schan := make(chan shutdowns)
 	mchan := make(chan net.Addr)
-	go packet_recv(conn, mchan)
+	go packetRecv(conn, mchan)
 	for {
 		addr := <-mchan
 		if recvonly {
 			continue
 		}
 		fmt.Println("call: sending stdin to", addr, "until EOF.")
-		go packet_send(conn, addr, schan)
+		go packetSend(conn, addr, schan)
 		goon := true
 		for goon {
 			// While we have an active stdin -> network copy,
 			// we simply discard incoming packet addresses and
-			// wait for the EOF signal from packet_send().
+			// wait for the EOF signal from packetSend().
 			select {
 			case <-mchan:
 			case <-schan:
@@ -335,7 +338,7 @@ func listen(proto, addr string) {
 			converse(nc, true)
 			nonquiet("call: connection done")
 		}
-		cxns += 1
+		cxns++
 	}
 	conn.Close()
 }
@@ -343,6 +346,7 @@ func listen(proto, addr string) {
 // ---
 // Client side conversation in general
 
+// ResolveAddr turns a proto plus address pair into a net.Addr.
 // BUG: This should be in the net package, not here.
 func ResolveAddr(proto, addr string) (net.Addr, error) {
 	switch proto {
@@ -361,9 +365,9 @@ func ResolveAddr(proto, addr string) (net.Addr, error) {
 	case "unix", "unixpacket", "unixgram":
 		return net.ResolveUnixAddr(proto, addr)
 	}
-	return nil, errors.New("cannot resolve address for protocol: "+proto)
+	return nil, errors.New("cannot resolve address for protocol: " + proto)
 }
-		
+
 // We accept 'ssl'/'tls' as a protocol; it implies 'tcp' as the underlying
 // protocol.
 func dial(proto, addr, laddr string) (net.Conn, error) {
@@ -398,7 +402,7 @@ func call(proto, addr, laddr string) {
 		warnf("connected to %s %s (%s):\n", proto, addr,
 			conn.RemoteAddr())
 	}
-		
+
 	converse(conn, false)
 }
 
@@ -442,8 +446,8 @@ func listprotos() {
 func main() {
 	proto := "tcp"
 	var addr, laddr string
-	var lstn *bool = flag.Bool("l", false, "listen for connections instead of make them")
-	var pprotos *bool = flag.Bool("P", false, "just print our known protocols")
+	var lstn = flag.Bool("l", false, "listen for connections instead of make them")
+	var pprotos = flag.Bool("P", false, "just print our known protocols")
 	flag.BoolVar(&quiet, "q", false, "be quieter in some situations")
 	flag.BoolVar(&verbose, "v", false, "be more verbose in some situations")
 	flag.IntVar(&conns, "C", 0, "if non-zero, only listen for this many connections then exit")
@@ -483,8 +487,7 @@ func main() {
 		// If arg[0] is a known protocol or arg[1] contains a :
 		// we assume that we have 'proto address'; otherwise we
 		// assume we have a two-argument 'host port' thing.
-		if isknownproto(flag.Arg(0)) ||
-		   strings.Contains(flag.Arg(1), ":") {
+		if isknownproto(flag.Arg(0)) || strings.Contains(flag.Arg(1), ":") {
 			proto = flag.Arg(0)
 			addr = flag.Arg(1)
 		} else {

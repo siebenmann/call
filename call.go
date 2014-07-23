@@ -70,7 +70,7 @@ const (
 )
 
 // Default network buffer size
-const DEFAULTNETBUF  = (64 * 1024)
+const DEFAULTNETBUF  = (128 * 1024)
 
 // These should probably be using the log package, or be replaced by it.
 

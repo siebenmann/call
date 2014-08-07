@@ -6,29 +6,32 @@
 // with them. This gets complex for UDP (and Unix datagram); see later.
 //
 // usage: call [-lPHRqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}
+//
 // Note that you have to specify arguments separately. Sigh.
-// -h: show brief usage
-// -P means list known protocols with some information.
-// -q means to be quieter in some situations.
-// -v means to be more verbose in some situations.
-// -b means to use the address as the local address. Doesn't apply to -l.
-//    For TCP and UDP, if the address lacks a ':' it's assumed to be a
-//    hostname or IP address.
-// -l means listen as a server. This behaves differently for stream and
-//    datagram protocols and does not support TLS/SSL (yet).
-// -C NUM means only listen for NUM connections during -l, then exit.
-// -B BYTES sets the buffer size for (network) IO; important for 10G Ethernet
-// -H prints datagram data in hex when in -l.
-// -R simply receives datagram data when in -l.
+//
+//    -h: show brief usage
+//    -P means list known protocols with some information.
+//    -q means to be quieter in some situations.
+//    -v means to be more verbose in some situations.
+//    -b means to use the address as the local address when making outgoing
+//       connections (ie, not with -l). For TCP and UDP, if the address
+//       lacks a ':' it's assumed to be a hostname or IP address.
+//    -l means listen as a server. This behaves differently for stream and
+//       datagram protocols and does not support TLS/SSL (yet).
+//    -C NUM means only listen for NUM connections during -l, then exit.
+//    -B BYTES sets the buffer size for (network) IO; this is potentially
+//       important for 10G Ethernet. The default buffer size is 128 KBytes.
+//    -H prints datagram data in hex when in -l.
+//    -R simply receives datagram data when in -l.
+//
 // [proto] is a protocol supported by the go net package plus some other
-//   options. See call -P. Not all supported protocols are useful or
-//   functional in practice, eg probably ip* and unixgram.
+// options. See call -P. Not all supported protocols are useful or
+// functional in practice, eg probably ip* and unixgram.
 //
 // Address is 'host:port' for IP protocols; 'host' may be omitted.
-// 'call :port' means 'call on localhost'; 'call -l :port' means 'listen
-// generally'.
-// The 'host port' form of this is only appropriate for protocols that
-// take both hosts and ports.
+// 'call :port' means 'call on localhost'; 'call -l :port' means
+// 'listen generally'. The 'host port' form of this is only
+// appropriate for protocols that take both hosts and ports.
 //
 // Note that go's TLS implementation sends SNI information, so if you
 // are testing a web server the Host: you provide must match the
@@ -36,6 +39,7 @@
 //
 // -l for stream protocols accepts one connection at a time and converses
 // with it until stdin EOF, then repeats this.
+//
 // -l for datagram protocols accepts and prints packets from anywhere.
 // When it receives a packet and it is not already sending stdin to
 // somewhere, it starts sending stdin to that source until EOF. After

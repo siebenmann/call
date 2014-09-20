@@ -1,18 +1,20 @@
-call: call.go
+SRC=call.go tlsnames.go
+
+call: $(SRC)
 	go build -o call
 
 all: call call32 call64 call.fbsd call.solaris
 
-call32: call.go
+call32: $(SRC)
 	GOARCH=386 go build -o call32
 
-call64: call.go
+call64: $(SRC)
 	GOARCH=amd64 go build -o call64
 
-call.fbsd: call.go
+call.fbsd: $(SRC)
 	GOOS=freebsd GOARCH=386 go build -o call.fbsd
 
-call.solaris: call.go
+call.solaris: $(SRC)
 	GOOS=solaris GOARCH=amd64 go build -o call.solaris
 
 # yes yes I know, 'go clean' or something. I'm old fashioned.

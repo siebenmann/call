@@ -13,6 +13,7 @@
 //    -P means list known protocols with some information.
 //    -q means to be quieter in some situations.
 //    -v means to be more verbose in some situations.
+//    -T reports TLS connection and server certificate information.
 //    -b means to use the address as the local address when making outgoing
 //       connections (ie, not with -l). For TCP and UDP, if the address
 //       lacks a ':' it's assumed to be a hostname or IP address.
@@ -91,12 +92,13 @@ func warnln(elems ...interface{}) {
 
 // ---
 // Global options
-var quiet bool    // -q
-var verbose bool  // -v
-var dgramhex bool // -H
-var recvonly bool // -R
-var conns int     // -C NUM, 0 is 'not enabled'
-var bufsize int   // -B bufsize, default is 64k
+var quiet bool     // -q
+var verbose bool   // -v
+var reporttls bool // -T
+var dgramhex bool  // -H
+var recvonly bool  // -R
+var conns int      // -C NUM, 0 is 'not enabled'
+var bufsize int    // -B bufsize, default is 128k
 
 // ---
 // Stream socket conversation support routines.
@@ -396,11 +398,34 @@ func dial(proto, addr, laddr string) (net.Conn, error) {
 	return net.Dial(proto, addr)
 }
 
+func tlsinfo(c net.Conn) {
+	tc, ok := c.(*tls.Conn)
+	if !ok {
+		return
+	}
+	cs := tc.ConnectionState()
+	cname, ok := cipherNames[cs.CipherSuite]
+	if !ok {
+		cname = fmt.Sprintf("cipher 0x%04x", cs.CipherSuite)
+	}
+	// there should always be at least one peer certificate.
+	// The first peer certificate is the certificate of the host
+	// itself, which is what we wanted.
+	pcert := cs.PeerCertificates[0]
+	warnf("TLS to TLS host %s with %s\n", pcert.Subject.CommonName, cname)
+	if len(pcert.DNSNames) > 0 && verbose {
+		warnf("alt names: %s\n", strings.Join(pcert.DNSNames, ", "))
+	}
+}
+
 func call(proto, addr, laddr string) {
 	conn, err := dial(proto, addr, laddr)
 	if err != nil {
 		warnf("error dialing %s!%s: %s\n", proto, addr, err)
 		return
+	}
+	if reporttls {
+		tlsinfo(conn)
 	}
 	if verbose {
 		warnf("connected to %s %s (%s):\n", proto, addr,
@@ -454,6 +479,7 @@ func main() {
 	var pprotos = flag.Bool("P", false, "just print our known protocols")
 	flag.BoolVar(&quiet, "q", false, "be quieter in some situations")
 	flag.BoolVar(&verbose, "v", false, "be more verbose in some situations")
+	flag.BoolVar(&reporttls, "T", false, "report TLS connection information")
 	flag.IntVar(&conns, "C", 0, "if non-zero, only listen for this many connections then exit")
 	flag.BoolVar(&dgramhex, "H", false, "print received datagrams as hex bytes")
 	flag.BoolVar(&recvonly, "R", false, "only receive datagrams, do not try to send stdin")

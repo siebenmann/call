@@ -480,11 +480,11 @@ func main() {
 	flag.BoolVar(&quiet, "q", false, "be quieter in some situations")
 	flag.BoolVar(&verbose, "v", false, "be more verbose in some situations")
 	flag.BoolVar(&reporttls, "T", false, "report TLS connection information")
-	flag.IntVar(&conns, "C", 0, "if non-zero, only listen for this many connections then exit")
+	flag.IntVar(&conns, "C", 0, "if non-zero, only listen for this many `connections` then exit")
 	flag.BoolVar(&dgramhex, "H", false, "print received datagrams as hex bytes")
 	flag.BoolVar(&recvonly, "R", false, "only receive datagrams, do not try to send stdin")
-	flag.StringVar(&laddr, "b", "", "make the call from this local address")
-	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO; important for 10G Ethernet")
+	flag.StringVar(&laddr, "b", "", "make the call from this local `address`")
+	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`; important for 10G Ethernet")
 
 	flag.Parse()
 

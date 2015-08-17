@@ -5,7 +5,7 @@
 // We can optionally listen for connections instead and then converse with
 // with them. This gets complex for UDP (and Unix datagram); see later.
 //
-// usage: call [-lPHRqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}
+// usage: call [-lPHRTqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}
 //
 // Note that you have to specify arguments separately. Sigh.
 //
@@ -484,7 +484,7 @@ func main() {
 	flag.BoolVar(&dgramhex, "H", false, "print received datagrams as hex bytes")
 	flag.BoolVar(&recvonly, "R", false, "only receive datagrams, do not try to send stdin")
 	flag.StringVar(&laddr, "b", "", "make the call from this local `address`")
-	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`; important for 10G Ethernet")
+	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`")
 
 	flag.Parse()
 
@@ -495,7 +495,7 @@ func main() {
 
 	switch narg := flag.NArg(); {
 	case narg > 3 || narg == 0:
-		fmt.Fprintln(os.Stderr, "usage: call [-lPHRqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}")
+		fmt.Fprintln(os.Stderr, "usage: call [-lPHRTqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}")
 		fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
 		fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
 		return

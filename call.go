@@ -471,6 +471,13 @@ func listprotos() {
 }
 
 //
+func usage() {
+	fmt.Fprintf(os.Stderr, "usage: %s [-h] [-lPHRTq] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}\n", os.Args[0])
+	fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
+	fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
+}
+
+//
 //
 func main() {
 	proto := "tcp"
@@ -483,8 +490,14 @@ func main() {
 	flag.IntVar(&conns, "C", 0, "if non-zero, only listen for this many `connections` then exit")
 	flag.BoolVar(&dgramhex, "H", false, "print received datagrams as hex bytes")
 	flag.BoolVar(&recvonly, "R", false, "only receive datagrams, do not try to send stdin")
-	flag.StringVar(&laddr, "b", "", "make the call from this local `address`")
+	flag.StringVar(&laddr, "b", "", "make the call from this local `address` (can be just an IP or hostname)")
 	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`")
+
+	flag.Usage = func() {
+		usage()
+		fmt.Fprintln(os.Stderr, "\nOptions:")
+		flag.PrintDefaults()
+	}
 
 	flag.Parse()
 
@@ -495,9 +508,7 @@ func main() {
 
 	switch narg := flag.NArg(); {
 	case narg > 3 || narg == 0:
-		fmt.Fprintln(os.Stderr, "usage: call [-lPHRTqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}")
-		fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
-		fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
+		usage()
 		return
 
 	case narg == 3:

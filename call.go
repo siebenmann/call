@@ -472,7 +472,7 @@ func listprotos() {
 
 //
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-h] [-lPHRTq] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s [-h] [-lHPRTqv] [-b address] [-B bufsize] [-C num] [proto] {address | host port}\n", os.Args[0])
 	fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
 	fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
 }
@@ -494,9 +494,10 @@ func main() {
 	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`")
 
 	flag.Usage = func() {
-		usage()
-		fmt.Fprintln(os.Stderr, "\nOptions:")
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] [protocol] {host port | address}\n", os.Args[0])
 		flag.PrintDefaults()
+		fmt.Fprintln(os.Stderr, "\n The default protocol is 'tcp'.")
+		fmt.Fprintln(os.Stderr, " The address may be given as host:port for IP-based protocols.")
 	}
 
 	flag.Parse()

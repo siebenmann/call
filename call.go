@@ -24,6 +24,7 @@
 //       important for 10G Ethernet. The default buffer size is 128 KBytes.
 //    -H prints datagram data in hex when in -l.
 //    -R simply receives datagram data when in -l.
+//    -N converts newlines in the input data to CR NL when sent to the network
 //
 // [proto] is a protocol supported by the go net package plus some other
 // options. See call -P. Not all supported protocols are useful or
@@ -44,7 +45,16 @@
 // -l for datagram protocols accepts and prints packets from anywhere.
 // When it receives a packet and it is not already sending stdin to
 // somewhere, it starts sending stdin to that source until EOF. After
-// EOF this repeats.
+// EOF this repeats. This behavior is disabled with -R; with -R, -l
+// never sends anything, it just receives.
+//
+// -H and -R only have any effect if you're listening for datagram
+// protocols.
+//
+// -N is a feature intended for talking to picky network services
+// for protocols that specify that the line ending is CR NL, not a
+// bare NL. Most servers accept a bare NL as the line ending for eg
+// SMTP, but a few servers really insist on CR NL.
 //
 // BUGS: this has too many options (because Chris got enthusiastic).
 //
@@ -56,6 +66,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"flag"
@@ -99,6 +110,7 @@ var dgramhex bool  // -H
 var recvonly bool  // -R
 var conns int      // -C NUM, 0 is 'not enabled'
 var bufsize int    // -B bufsize, default is 128k
+var convnl bool    // Convert NL in input to CR NL to the network
 
 // ---
 // Stream socket conversation support routines.
@@ -144,9 +156,48 @@ func fromto(src io.Reader, dst io.Writer, imsg, omsg string) {
 	}
 }
 
+// A version of fromto() that converts NL to CR NL. There is probably
+// a way to do this in the standard library.
+//
+// TODO: this, and hex output, should really be io.Writer wrappers.
+func fromtonl(src io.Reader, dst io.Writer, imsg, omsg string) {
+	var rerr, werr error
+	buf := make([]byte, bufsize)
+
+	for rerr == nil && werr == nil {
+		var n, i, idx int
+		n, rerr = src.Read(buf[0:])
+		if rerr != nil && rerr != io.EOF {
+			warnln(imsg, "read error", rerr)
+		}
+		// We cannot use bytes.Split() / bytes.SplitAfter()
+		// because it obscures the case of a block of input
+		// without a NL at all.
+		// TODO: the standard library probably has something
+		// to deal with this.
+		for i = 0; i < n && werr == nil; i = idx + 1 {
+			idx = bytes.IndexByte(buf[i:n], '\n')
+			if idx == -1 {
+				werr = writeall(dst, buf[i:n])
+				idx = n
+			} else {
+				idx += i
+				werr = writeall(dst, buf[i:idx])
+				if werr == nil {
+					werr = writeall(dst, []byte("\r\n"))
+				}
+			}
+		}
+	}
+}
+
 // copy stdin to remote, send readShutdown to master on end.
 func tonet(remote net.Conn, master chan shutdowns) {
-	fromto(os.Stdin, remote, "stdin", "network")
+	if convnl {
+		fromtonl(os.Stdin, remote, "stdin", "network")
+	} else {
+		fromto(os.Stdin, remote, "stdin", "network")
+	}
 	master <- readShutdown
 }
 
@@ -472,7 +523,7 @@ func listprotos() {
 
 //
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-h] [-lHPRTqv] [-b address] [-B bufsize] [-C num] [proto] {address | host port}\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s [-h] [-lHNPRTqv] [-b address] [-B bufsize] [-C num] [proto] {address | host port}\n", os.Args[0])
 	fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
 	fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
 }
@@ -487,11 +538,12 @@ func main() {
 	flag.BoolVar(&quiet, "q", false, "be quieter in some situations")
 	flag.BoolVar(&verbose, "v", false, "be more verbose in some situations")
 	flag.BoolVar(&reporttls, "T", false, "report TLS connection information")
-	flag.IntVar(&conns, "C", 0, "if non-zero, only listen for this many `connections` then exit")
-	flag.BoolVar(&dgramhex, "H", false, "print received datagrams as hex bytes")
-	flag.BoolVar(&recvonly, "R", false, "only receive datagrams, do not try to send stdin")
+	flag.IntVar(&conns, "C", 0, "if non-zero, -l only listens for this many `connections` then exits")
+	flag.BoolVar(&dgramhex, "H", false, "for -l, print received UDP/Unix datagrams as hex bytes")
+	flag.BoolVar(&recvonly, "R", false, "for -l, only receive datagrams, do not try to send stdin")
 	flag.StringVar(&laddr, "b", "", "make the call from this local `address` (can be just an IP or hostname)")
 	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`")
+	flag.BoolVar(&convnl, "N", false, "convert newlines in the input to CR NL")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s [flags] [protocol] {host port | address}\n", os.Args[0])

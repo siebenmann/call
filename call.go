@@ -54,7 +54,9 @@
 // -N is a feature intended for talking to picky network services
 // for protocols that specify that the line ending is CR NL, not a
 // bare NL. Most servers accept a bare NL as the line ending for eg
-// SMTP, but a few servers really insist on CR NL.
+// SMTP, but a few servers really insist on CR NL. Note that the
+// NL to CR NL conversion happens for all NLs in the input, even if
+// there's already a CR before them. Arguably this is a bug.
 //
 // BUGS: this has too many options (because Chris got enthusiastic).
 //
@@ -141,48 +143,55 @@ func fromto(src io.Reader, dst io.Writer, imsg, omsg string) {
 	}
 }
 
-// A version of fromto() that converts NL to CR NL. There is probably
-// a way to do this in the standard library.
-//
-// TODO: this, and hex output, should really be io.Writer wrappers.
-func fromtonl(src io.Reader, dst io.Writer, imsg, omsg string) {
-	var rerr, werr error
-	buf := make([]byte, bufsize)
+// crnlWriter is an io.Writer that turns NL into CR NL on output to an
+// underlying io.Writer. As a result it may make multiple io.Write calls.
+type crnlWriter struct {
+	dst io.Writer
+}
 
-	for rerr == nil && werr == nil {
-		var n, i, idx int
-		n, rerr = src.Read(buf[0:])
-		if rerr != nil && rerr != io.EOF {
-			warnln(imsg, "read error", rerr)
-		}
-		// We cannot use bytes.Split() / bytes.SplitAfter()
-		// because it obscures the case of a block of input
-		// without a NL at all.
-		// TODO: the standard library probably has something
-		// to deal with this.
-		for i = 0; i < n && werr == nil; i = idx + 1 {
-			idx = bytes.IndexByte(buf[i:n], '\n')
-			if idx == -1 {
-				_, werr = dst.Write(buf[i:n])
-				idx = n
-			} else {
-				idx += i
-				_, werr = dst.Write(buf[i:idx])
-				if werr == nil {
-					_, werr = dst.Write([]byte("\r\n"))
-				}
+func (cn *crnlWriter) Write(buf []byte) (int, error) {
+	var werr error
+	var cnt, idx int
+
+	// We cannot use bytes.Split() / bytes.SplitAfter() because it
+	// obscures the case of a block of input without a NL at all.
+	// TODO: the standard library probably has something to deal
+	// with this.
+	n := len(buf)
+	for i := 0; i < n && werr == nil; i = idx + 1 {
+		var t int
+		idx = bytes.IndexByte(buf[i:n], '\n')
+		if idx == -1 {
+			t, werr = cn.dst.Write(buf[i:n])
+			idx = n
+			cnt += t
+		} else {
+			idx += i
+			t, werr = cn.dst.Write(buf[i:idx])
+			cnt += t
+			if werr == nil {
+				t, werr = cn.dst.Write([]byte("\r\n"))
+				// cnt is how far we've gone through
+				// the buffer, not how many bytes we've
+				// written to the underlying channel.
+				// So we must advance it by only one
+				// here.
+				cnt += 1
 			}
 		}
 	}
+	return cnt, werr
 }
 
 // copy stdin to remote, send readShutdown to master on end.
 func tonet(remote net.Conn, master chan shutdowns) {
+	var rem io.Writer
 	if convnl {
-		fromtonl(os.Stdin, remote, "stdin", "network")
+		rem = &crnlWriter{dst: remote}
 	} else {
-		fromto(os.Stdin, remote, "stdin", "network")
+		rem = remote
 	}
+	fromto(os.Stdin, rem, "stdin", "network")
 	master <- readShutdown
 }
 

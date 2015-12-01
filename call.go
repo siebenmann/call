@@ -117,21 +117,6 @@ var convnl bool    // Convert NL in input to CR NL to the network
 // These also work for *sending* to datagram sockets, but you can't use
 // them when listening on datagram sockets.
 
-// Write all of buf to dst unless an error happens. Returns the error
-// or nil, as usual. A general version would return the amount written
-// as well as the error but we don't need that.
-// Does nothing if buf is empty.
-// Note that this can potentially do odd things with datagram sockets
-// if the buf doesn't fit in one packet/message.
-func writeall(dst io.Writer, buf []byte) (err error) {
-	for len(buf) > 0 && err == nil {
-		var nr int
-		nr, err = dst.Write(buf)
-		buf = buf[nr:]
-	}
-	return
-}
-
 // read from src, write to dst, put imsg or omsg in the error message if
 // something happens. No error message is printed for EOF on src.
 func fromto(src io.Reader, dst io.Writer, imsg, omsg string) {
@@ -149,7 +134,7 @@ func fromto(src io.Reader, dst io.Writer, imsg, omsg string) {
 			warnln(imsg, "read error:", rerr)
 		}
 		// if n is 0 this does nothing.
-		werr = writeall(dst, buf[0:n])
+		_, werr = dst.Write(buf[0:n])
 		if werr != nil {
 			warnln(omsg, "write error:", werr)
 		}
@@ -178,13 +163,13 @@ func fromtonl(src io.Reader, dst io.Writer, imsg, omsg string) {
 		for i = 0; i < n && werr == nil; i = idx + 1 {
 			idx = bytes.IndexByte(buf[i:n], '\n')
 			if idx == -1 {
-				werr = writeall(dst, buf[i:n])
+				_, werr = dst.Write(buf[i:n])
 				idx = n
 			} else {
 				idx += i
-				werr = writeall(dst, buf[i:idx])
+				_, werr = dst.Write(buf[i:idx])
 				if werr == nil {
-					werr = writeall(dst, []byte("\r\n"))
+					_, werr = dst.Write([]byte("\r\n"))
 				}
 			}
 		}

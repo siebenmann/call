@@ -7,7 +7,7 @@
 //
 // usage: call [-lPHRTqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}
 //
-// Note that you have to specify arguments separately. Sigh.
+// Note that you have to specify each flag separately. Sigh.
 //
 //    -h: show brief usage
 //    -P means list known protocols with some information.

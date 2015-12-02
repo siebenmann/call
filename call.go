@@ -61,7 +61,7 @@
 // BUGS: this has too many options (because Chris got enthusiastic).
 //
 // Author: Chris Siebenmann
-// https://github.com/siebenmann/call.go
+// https://github.com/siebenmann/call
 //
 // Copyright: GPL v3
 //

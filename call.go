@@ -87,7 +87,7 @@ const (
 	writeShutdown
 )
 
-// Default network buffer size
+// DEFAULTNETBUF is the default network buffer size
 const DEFAULTNETBUF = (128 * 1024)
 
 // These should probably be using the log package, or be replaced by it.
@@ -176,7 +176,7 @@ func (cn *crnlWriter) Write(buf []byte) (int, error) {
 				// written to the underlying channel.
 				// So we must advance it by only one
 				// here.
-				cnt += 1
+				cnt++
 			}
 		}
 	}
@@ -207,6 +207,7 @@ func fromnet(remote net.Conn, master chan shutdowns) {
 // See http://utcc.utoronto.ca/~cks/space/blog/programming/GoInterfacePunning
 // for an explanation of how this works.
 
+// Closer is the interface type of things that can do a shutdown().
 type Closer interface {
 	CloseRead() error
 	CloseWrite() error

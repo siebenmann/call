@@ -501,6 +501,18 @@ func isknownproto(s string) bool {
 	return true
 }
 
+// Guess the protocol given the port.
+// We know a few TLS-based protocols.
+// TODO: implement this better.
+func guessproto(port string, defproto string) string {
+	switch port {
+	case "https", "smtps", "imaps", "pop3s", "443", "465", "993", "995":
+		return "tls"
+	default:
+		return defproto
+	}
+}
+
 //
 // It would be nice if this didn't have to be hardcoded. See above.
 func listprotos() {
@@ -580,6 +592,7 @@ func main() {
 			proto = flag.Arg(0)
 			addr = flag.Arg(1)
 		} else {
+			proto = guessproto(flag.Arg(1), proto)
 			addr = flag.Arg(0) + ":" + flag.Arg(1)
 		}
 	case narg == 1:

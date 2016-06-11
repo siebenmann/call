@@ -17,6 +17,7 @@
 //    -b means to use the address as the local address when making outgoing
 //       connections (ie, not with -l). For TCP and UDP, if the address
 //       lacks a ':' it's assumed to be a hostname or IP address.
+//    -t sets a connection timeout for outgoing connections.
 //    -l means listen as a server. This behaves differently for stream and
 //       datagram protocols and does not support TLS/SSL (yet).
 //    -C NUM means only listen for NUM connections during -l, then exit.
@@ -77,6 +78,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"time"
 )
 
 // an enum, basically.
@@ -422,26 +424,32 @@ func ResolveAddr(proto, addr string) (net.Addr, error) {
 
 // We accept 'ssl'/'tls' as a protocol; it implies 'tcp' as the underlying
 // protocol.
-func dial(proto, addr, laddr string) (net.Conn, error) {
+func dial(proto, addr, laddr string, tmout time.Duration) (net.Conn, error) {
+	// Set up our dialer options; we may need a local address and/or
+	// a connection timeout.
+	// TODO: happy eyeballs support, ie dialer.DualStack? This might be
+	// worth a command line switch.
+	var dialer net.Dialer
+	dialer.Timeout = tmout
+	if laddr != "" {
+		a, e := ResolveAddr(proto, laddr)
+		if e != nil {
+			return nil, e
+		}
+		dialer.LocalAddr = a
+	}
+
 	switch proto {
 	case "ssl", "tls":
 		// For testing I do not want to have to verify anything
 		// about the target certificates. I have other tools for
 		// that.
 		cfg := tls.Config{InsecureSkipVerify: true}
-		return tls.Dial("tcp", addr, &cfg)
+		return tls.DialWithDialer(&dialer, "tcp", addr, &cfg)
 	case "sslver", "tlsver":
-		return tls.Dial("tcp", addr, nil)
+		return tls.DialWithDialer(&dialer, "tcp", addr, nil)
 	}
-	if laddr != "" {
-		a, e := ResolveAddr(proto, laddr)
-		if e != nil {
-			return nil, e
-		}
-		t := &net.Dialer{LocalAddr: a}
-		return t.Dial(proto, addr)
-	}
-	return net.Dial(proto, addr)
+	return dialer.Dial(proto, addr)
 }
 
 func tlsinfo(c net.Conn) {
@@ -464,8 +472,8 @@ func tlsinfo(c net.Conn) {
 	}
 }
 
-func call(proto, addr, laddr string) {
-	conn, err := dial(proto, addr, laddr)
+func call(proto, addr, laddr string, tmout time.Duration) {
+	conn, err := dial(proto, addr, laddr, tmout)
 	if err != nil {
 		warnf("error dialing %s!%s: %s\n", proto, addr, err)
 		return
@@ -540,6 +548,7 @@ func usage() {
 func main() {
 	proto := "tcp"
 	var addr, laddr string
+	var tmout time.Duration
 	var lstn = flag.Bool("l", false, "listen for connections instead of make them")
 	var pprotos = flag.Bool("P", false, "just print our known protocols")
 	flag.BoolVar(&quiet, "q", false, "be quieter in some situations")
@@ -551,6 +560,9 @@ func main() {
 	flag.StringVar(&laddr, "b", "", "make the call from this local `address` (can be just an IP or hostname)")
 	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`")
 	flag.BoolVar(&convnl, "N", false, "convert newlines in the input to CR NL")
+	// I really wish we could specify a default unit for duration parsing
+	// so people did not have to say '3s' for '3 seconds'.
+	flag.DurationVar(&tmout, "t", 0, "connection timeout for the call if any; use eg '1s' for seconds")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s [flags] [protocol] {host port | address}\n", os.Args[0])
@@ -625,6 +637,6 @@ func main() {
 		// protocols; net.Dial() makes it all work.
 		// (Don't ask me how unixgram works one way and not the
 		// other.)
-		call(proto, addr, laddr)
+		call(proto, addr, laddr, tmout)
 	}
 }

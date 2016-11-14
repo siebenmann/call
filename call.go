@@ -466,9 +466,33 @@ func tlsinfo(c net.Conn) {
 	// The first peer certificate is the certificate of the host
 	// itself, which is what we wanted.
 	pcert := cs.PeerCertificates[0]
-	warnf("TLS to TLS host %s with %s\n", pcert.Subject.CommonName, cname)
-	if len(pcert.DNSNames) > 0 && verbose {
-		warnf("alt names: %s\n", strings.Join(pcert.DNSNames, ", "))
+	// Some TLS certificates lack a CN and have all associated DNS
+	// names in pcert.DNSNames. We don't try to fix this up here,
+	// just report that the CN is missing.
+	cn := pcert.Subject.CommonName
+	if cn == "" {
+		cn = "<no CN>"
+	}
+	warnf("TLS to TLS host %s with %s\n", cn, cname)
+	// Only report DNS names that are different from the CN, ie
+	// report additional names. We don't check that the CN is
+	// included in DNSNames or anything; we're reporting
+	// information, not alerting about oddities.
+	//
+	// (We could report all of DNSNames, but it's nicer to trim it
+	// down slightly. Some of the time this lets us not report
+	// altnames at all, since it's a single entry duplicate of the
+	// CN.)
+	var altnames []string
+	for _, s := range pcert.DNSNames {
+		if s != pcert.Subject.CommonName {
+			altnames = append(altnames, s)
+		}
+	}
+	if len(altnames) > 0 && verbose {
+		warnf("alt names: %s; valid %s to %s\n", strings.Join(altnames, ", "), pcert.NotBefore.Format("2006-01-02"), pcert.NotAfter.Format("2006-01-02"))
+	} else if verbose {
+		warnf("valid %s to %s\n", pcert.NotBefore.Format("2006-01-02"), pcert.NotAfter.Format("2006-01-02"))
 	}
 }
 

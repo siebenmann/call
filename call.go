@@ -172,7 +172,7 @@ func (cn *crnlWriter) Write(buf []byte) (int, error) {
 			t, werr = cn.dst.Write(buf[i:idx])
 			cnt += t
 			if werr == nil {
-				t, werr = cn.dst.Write([]byte("\r\n"))
+				_, werr = cn.dst.Write([]byte("\r\n"))
 				// cnt is how far we've gone through
 				// the buffer, not how many bytes we've
 				// written to the underlying channel.
@@ -287,7 +287,7 @@ func packetRecv(conn net.PacketConn, master chan net.Addr) {
 		if dgramhex {
 			bufStr = fmt.Sprintf("0x % x\n", buf[:n])
 		} else {
-			bufStr = fmt.Sprintf("%s", string(buf[:n]))
+			bufStr = string(buf[:n])
 		}
 
 		if quiet {

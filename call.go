@@ -632,7 +632,19 @@ func main() {
 			addr = flag.Arg(0) + ":" + flag.Arg(1)
 		}
 	case narg == 1:
+		// By extension with the two argument case, we attempt
+		// to guess the protocol based on the port. Generally
+		// it's going to be there (as the last :, given IPv6
+		// addresses).
+		// This will do odd things in combination with -l for
+		// a TLS-based service, but then you probably want to
+		// be explicit there anyway. Or at least that's my
+		// excuse.
 		addr = flag.Arg(0)
+		n := strings.LastIndexByte(addr, ':')
+		if n != -1 {
+			proto = guessproto(addr[n+1:], proto)
+		}
 	}
 
 	if !isknownproto(proto) {

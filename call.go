@@ -406,7 +406,7 @@ func ResolveAddr(proto, addr string) (net.Addr, error) {
 	switch proto {
 	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6":
 		if !strings.Contains(addr, ":") {
-			addr = addr + ":0"
+			addr += ":0"
 		}
 	}
 	switch proto {

@@ -26,6 +26,7 @@
 //    -H prints datagram data in hex when in -l.
 //    -R simply receives datagram data when in -l.
 //    -N converts newlines in the input data to CR NL when sent to the network
+//    -L appends a newline when printing datagrams that lack them when in -l.
 //
 // [proto] is a protocol supported by the go net package plus some other
 // options. See call -P. Not all supported protocols are useful or
@@ -115,6 +116,7 @@ var recvonly bool  // -R
 var conns int      // -C NUM, 0 is 'not enabled'
 var bufsize int    // -B bufsize, default is 128k
 var convnl bool    // Convert NL in input to CR NL to the network
+var addnl bool     // Add a newline after records on receive if they lack them.
 
 // ---
 // Stream socket conversation support routines.
@@ -288,6 +290,9 @@ func packetRecv(conn net.PacketConn, master chan net.Addr) {
 			bufStr = fmt.Sprintf("0x % x\n", buf[:n])
 		} else {
 			bufStr = string(buf[:n])
+		}
+		if addnl && buf[n] != '\n' {
+			bufStr += "\n"
 		}
 
 		if quiet {
@@ -584,6 +589,8 @@ func main() {
 	flag.StringVar(&laddr, "b", "", "make the call from this local `address` (can be just an IP or hostname)")
 	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`")
 	flag.BoolVar(&convnl, "N", false, "convert newlines in the input to CR NL")
+	flag.BoolVar(&addnl, "L", false, "for -l, append a newline to the received datagrams if they lack them")
+
 	// I really wish we could specify a default unit for duration parsing
 	// so people did not have to say '3s' for '3 seconds'.
 	flag.DurationVar(&tmout, "t", 0, "connection timeout for the call if any; use eg '1s' for seconds")

@@ -219,7 +219,7 @@ type Closer interface {
 
 func shutdownWrite(conn net.Conn) bool {
 	if v, ok := conn.(Closer); ok {
-		v.CloseWrite()
+		_ = v.CloseWrite()
 		return true
 	}
 	return false
@@ -262,7 +262,7 @@ func converse(conn net.Conn, server bool) {
 	// way to break it out of its read.
 	// (In client operation we don't care so much about stranding
 	// our read of stdin, although things can happen there too!)
-	conn.Close()
+	_ = conn.Close()
 }
 
 // ---
@@ -399,7 +399,7 @@ func listen(proto, addr string) {
 		}
 		cxns++
 	}
-	conn.Close()
+	_ = conn.Close()
 }
 
 // ---

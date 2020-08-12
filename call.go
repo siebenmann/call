@@ -463,10 +463,7 @@ func tlsinfo(c net.Conn) {
 		return
 	}
 	cs := tc.ConnectionState()
-	cname, ok := cipherNames[cs.CipherSuite]
-	if !ok {
-		cname = fmt.Sprintf("cipher 0x%04x", cs.CipherSuite)
-	}
+	cname := cipherSuiteName(cs.CipherSuite)
 	// there should always be at least one peer certificate.
 	// The first peer certificate is the certificate of the host
 	// itself, which is what we wanted.

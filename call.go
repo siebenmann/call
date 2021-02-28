@@ -542,7 +542,7 @@ func isknownproto(s string) bool {
 // TODO: implement this better.
 func guessproto(port string, defproto string) string {
 	switch port {
-	case "https", "smtps", "imaps", "pop3s", "443", "465", "993", "995":
+	case "https", "smtps", "ldaps", "imaps", "pop3s", "443", "465", "636", "993", "995":
 		return "tls"
 	default:
 		return defproto

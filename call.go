@@ -14,6 +14,7 @@
 //    -q means to be quieter in some situations.
 //    -v means to be more verbose in some situations.
 //    -T reports TLS connection and server certificate information.
+//    -I doesn't verify TLS server certificates on connections
 //    -b means to use the address as the local address when making outgoing
 //       connections (ie, not with -l). For TCP and UDP, if the address
 //       lacks a ':' it's assumed to be a hostname or IP address.
@@ -117,6 +118,7 @@ var conns int      // -C NUM, 0 is 'not enabled'
 var bufsize int    // -B bufsize, default is 128k
 var convnl bool    // Convert NL in input to CR NL to the network
 var addnl bool     // Add a newline after records on receive if they lack them.
+var insec bool     // Do not verify TLS certificates
 
 // ---
 // Stream socket conversation support routines.
@@ -446,13 +448,13 @@ func dial(proto, addr, laddr string, tmout time.Duration) (net.Conn, error) {
 
 	switch proto {
 	case "ssl", "tls":
-		// For testing I do not want to have to verify anything
-		// about the target certificates. I have other tools for
-		// that.
-		cfg := tls.Config{InsecureSkipVerify: true}
+		// In 2021, TLS connections should verify server
+		// certificates by default.
+		cfg := tls.Config{}
+		if insec {
+			cfg.InsecureSkipVerify = true
+		}
 		return tls.DialWithDialer(&dialer, "tcp", addr, &cfg)
-	case "sslver", "tlsver":
-		return tls.DialWithDialer(&dialer, "tcp", addr, nil)
 	}
 	return dialer.Dial(proto, addr)
 }
@@ -526,7 +528,7 @@ func isknownproto(s string) bool {
 		// we can't currently support the ip / ipv4 / ipv6
 		// protocol options that Dial et al does.
 
-	case "ssl", "tls", "sslver", "tlsver":
+	case "ssl", "tls":
 		// these our our special additions.
 
 	default:
@@ -554,17 +556,16 @@ func listprotos() {
   tcp tcp4 tcp6 unix unixpacket		[stream protocols, more or less]
   udp udp4 udp6 unixgram		[datagram protocols]
 
-  ssl tls		[TLS/SSL without certificate verification]
-  sslver tlsver		[TLS/SSL with certificate verification]
+  ssl tls		[TLS/SSL with certificate verification]
 
- TLS/SSL protocols do not support -l.
+ TLS/SSL does not support -l.
  unix* protocols take a filename as their address; for -l, it shouldn't
  already exist.`)
 }
 
 //
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-h] [-lHNPRTqv] [-b address] [-B bufsize] [-C num] [proto] {address | host port}\n", os.Args[0])
+	fmt.Fprintf(os.Stderr, "usage: %s [-h] [-lHINPRTqv] [-b address] [-B bufsize] [-C num] [proto] {address | host port}\n", os.Args[0])
 	fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
 	fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
 }
@@ -587,6 +588,7 @@ func main() {
 	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`")
 	flag.BoolVar(&convnl, "N", false, "convert newlines in the input to CR NL")
 	flag.BoolVar(&addnl, "L", false, "for -l, append a newline to the received datagrams if they lack them")
+	flag.BoolVar(&insec, "I", false, "don't verify the server TLS certificate for TLS connections")
 
 	// I really wish we could specify a default unit for duration parsing
 	// so people did not have to say '3s' for '3 seconds'.
@@ -664,7 +666,7 @@ func main() {
 		switch proto {
 		case "udp", "udp4", "udp6", "unixgram":
 			listenpacket(proto, addr)
-		case "ssl", "tls", "sslver", "tlsver":
+		case "ssl", "tls":
 			// We might as well be friendly.
 			warnf("protocol %s not supported for listening\n",
 				proto)

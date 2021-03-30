@@ -595,7 +595,7 @@ func main() {
 	flag.BoolVar(&convnl, "N", false, "convert newlines in the input to CR NL")
 	flag.BoolVar(&addnl, "L", false, "for -l, append a newline to the received datagrams if they lack them")
 	flag.BoolVar(&insec, "I", false, "don't verify the server TLS certificate for TLS connections")
-	flag.StringVar(&sniname, "n", "", "TLS server name for SNI (defaults to hostname)")
+	flag.StringVar(&sniname, "n", "", "The server `name` for TLS SNI (defaults to the hostname)")
 
 	// I really wish we could specify a default unit for duration parsing
 	// so people did not have to say '3s' for '3 seconds'.

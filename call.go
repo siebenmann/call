@@ -5,7 +5,7 @@
 // We can optionally listen for connections instead and then converse with
 // with them. This gets complex for UDP (and Unix datagram); see later.
 //
-// usage: call [-lPHRTqh] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}
+// usage: call [-lPHRTqh] [-n servername] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}
 //
 // Note that you have to specify each flag separately. Sigh.
 //
@@ -15,6 +15,8 @@
 //    -v means to be more verbose in some situations.
 //    -T reports TLS connection and server certificate information.
 //    -I doesn't verify TLS server certificates on connections
+//    -n servername provides the TLS server name for SNI; otherwise it
+//       is the hostname.
 //    -b means to use the address as the local address when making outgoing
 //       connections (ie, not with -l). For TCP and UDP, if the address
 //       lacks a ':' it's assumed to be a hostname or IP address.
@@ -40,7 +42,7 @@
 //
 // Note that go's TLS implementation sends SNI information, so if you
 // are testing a web server the Host: you provide must match the
-// actual hostname you gave call.
+// actual hostname you gave call (possibly in a -n argument).
 //
 // -l for stream protocols accepts one connection at a time and converses
 // with it until stdin EOF, then repeats this.
@@ -119,6 +121,7 @@ var bufsize int    // -B bufsize, default is 128k
 var convnl bool    // Convert NL in input to CR NL to the network
 var addnl bool     // Add a newline after records on receive if they lack them.
 var insec bool     // Do not verify TLS certificates
+var sniname string // Server name for TLS connections
 
 // ---
 // Stream socket conversation support routines.
@@ -454,6 +457,9 @@ func dial(proto, addr, laddr string, tmout time.Duration) (net.Conn, error) {
 		if insec {
 			cfg.InsecureSkipVerify = true
 		}
+		if sniname != "" {
+			cfg.ServerName = sniname
+		}
 		return tls.DialWithDialer(&dialer, "tcp", addr, &cfg)
 	}
 	return dialer.Dial(proto, addr)
@@ -589,6 +595,7 @@ func main() {
 	flag.BoolVar(&convnl, "N", false, "convert newlines in the input to CR NL")
 	flag.BoolVar(&addnl, "L", false, "for -l, append a newline to the received datagrams if they lack them")
 	flag.BoolVar(&insec, "I", false, "don't verify the server TLS certificate for TLS connections")
+	flag.StringVar(&sniname, "n", "", "TLS server name for SNI (defaults to hostname)")
 
 	// I really wish we could specify a default unit for duration parsing
 	// so people did not have to say '3s' for '3 seconds'.

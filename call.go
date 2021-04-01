@@ -5,31 +5,8 @@
 // We can optionally listen for connections instead and then converse with
 // with them. This gets complex for UDP (and Unix datagram); see later.
 //
-// usage: call [-lPHRTqh] [-n servername] [-b address] [-B bufsize] [-C NUM] [proto] {address | host port}
-//
-// Note that you have to specify each flag separately. Sigh.
-//
-//    -h: show brief usage
-//    -P means list known protocols with some information.
-//    -q means to be quieter in some situations.
-//    -v means to be more verbose in some situations.
-//    -T reports TLS connection and server certificate information.
-//    -I doesn't verify TLS server certificates on connections
-//    -n servername provides the TLS server name for SNI; otherwise it
-//       is the hostname.
-//    -b means to use the address as the local address when making outgoing
-//       connections (ie, not with -l). For TCP and UDP, if the address
-//       lacks a ':' it's assumed to be a hostname or IP address.
-//    -t sets a connection timeout for outgoing connections.
-//    -l means listen as a server. This behaves differently for stream and
-//       datagram protocols and does not support TLS/SSL (yet).
-//    -C NUM means only listen for NUM connections during -l, then exit.
-//    -B BYTES sets the buffer size for (network) IO; this is potentially
-//       important for 10G Ethernet. The default buffer size is 128 KBytes.
-//    -H prints datagram data in hex when in -l.
-//    -R simply receives datagram data when in -l.
-//    -N converts newlines in the input data to CR NL when sent to the network
-//    -L appends a newline when printing datagrams that lack them when in -l.
+// usage: call [options] [proto] {address | host port}
+// See 'call -h' for options.
 //
 // [proto] is a protocol supported by the go net package plus some other
 // options. See call -P. Not all supported protocols are useful or
@@ -76,13 +53,14 @@ import (
 	"bytes"
 	"crypto/tls"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/pborman/getopt/v2"
 )
 
 // an enum, basically.
@@ -564,16 +542,9 @@ func listprotos() {
 
   ssl tls		[TLS/SSL with certificate verification]
 
- TLS/SSL does not support -l.
+ TLS/SSL does not support -l. Use -I to disable certificate verification.
  unix* protocols take a filename as their address; for -l, it shouldn't
  already exist.`)
-}
-
-//
-func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s [-h] [-lHINPRTqv] [-b address] [-B bufsize] [-C num] [proto] {address | host port}\n", os.Args[0])
-	fmt.Fprintln(os.Stderr, "  address is host:port for appropriate protocols.")
-	fmt.Fprintln(os.Stderr, "  default proto is tcp. See -P for protocols. -l listens instead of calls.")
 }
 
 //
@@ -582,53 +553,66 @@ func main() {
 	proto := "tcp"
 	var addr, laddr string
 	var tmout time.Duration
-	var lstn = flag.Bool("l", false, "listen for connections instead of make them")
-	var pprotos = flag.Bool("P", false, "just print our known protocols")
-	flag.BoolVar(&quiet, "q", false, "be quieter in some situations")
-	flag.BoolVar(&verbose, "v", false, "be more verbose in some situations")
-	flag.BoolVar(&reporttls, "T", false, "report TLS connection information")
-	flag.IntVar(&conns, "C", 0, "if non-zero, -l only listens for this many `connections` then exits")
-	flag.BoolVar(&dgramhex, "H", false, "for -l, print received UDP/Unix datagrams as hex bytes")
-	flag.BoolVar(&recvonly, "R", false, "for -l, only receive datagrams, do not try to send stdin")
-	flag.StringVar(&laddr, "b", "", "make the call from this local `address` (can be just an IP or hostname)")
-	flag.IntVar(&bufsize, "B", DEFAULTNETBUF, "the buffer size for (network) IO, in `bytes`")
-	flag.BoolVar(&convnl, "N", false, "convert newlines in the input to CR NL")
-	flag.BoolVar(&addnl, "L", false, "for -l, append a newline to the received datagrams if they lack them")
-	flag.BoolVar(&insec, "I", false, "don't verify the server TLS certificate for TLS connections")
-	flag.StringVar(&sniname, "n", "", "The server `name` for TLS SNI (defaults to the hostname)")
+	var lstn, pprotos, help bool
+
+	getopt.FlagLong(&lstn, "listen", 'l', "Listen for connections instead of make them.")
+	getopt.FlagLong(&pprotos, "protocols", 'P', "Just print our known protocols.")
+	getopt.FlagLong(&quiet, "quiet", 'q', "Be quieter in some situations.")
+	getopt.FlagLong(&verbose, "verbose", 'v', "Be more verbose in some situations.")
+	getopt.FlagLong(&help, "help", 'h', "Print help.")
+	getopt.FlagLong(&reporttls, "tlsinfo", 'T', "Report TLS connection information.")
+	getopt.FlagLong(&conns, "maxconns", 'C', "For -l, only listen for this many connections then exit.", "COUNT")
+	getopt.FlagLong(&dgramhex, "hex", 'H', "For -l, print received UDP/Unix datagrams as hex bytes.")
+	getopt.FlagLong(&recvonly, "receive", 'R', "For -l, only receive datagrams, do not try to send stdin.")
+	getopt.FlagLong(&laddr, "local", 'b', "Make the call from this local address (can be just an IP or hostname).", "ADDRESS")
+	bufsize = DEFAULTNETBUF
+	getopt.FlagLong(&bufsize, "bufsize", 'B', "Set the buffer size for (network) IO, in bytes.", "BYTES")
+	getopt.FlagLong(&convnl, "crnl", 'N', "Convert newlines in the input to CR NL.")
+	getopt.Flag(&addnl, 'L', "For -l, append a newline to the received datagrams if they lack them.")
+	getopt.FlagLong(&insec, "insecure", 'I', "Don't verify the server TLS certificate for TLS connections.")
+	getopt.FlagLong(&sniname, "name", 'n', "The server name for TLS SNI (defaults to the hostname).", "SERVERNAME")
 
 	// I really wish we could specify a default unit for duration parsing
 	// so people did not have to say '3s' for '3 seconds'.
-	flag.DurationVar(&tmout, "t", 0, "connection timeout for the call if any; use eg '1s' for seconds")
+	getopt.FlagLong(&tmout, "timeout", 't', "Connection timeout for the call if any; use eg '1s' for seconds.", "DURATION")
 
-	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: %s [flags] [protocol] {host port | address}\n", os.Args[0])
-		flag.PrintDefaults()
+	getopt.SetParameters("[protocol] {host port | address}")
+
+	getopt.SetUsage(func() {
+		getopt.PrintUsage(os.Stderr)
 		fmt.Fprintln(os.Stderr, "\n The default protocol is 'tcp'.")
 		fmt.Fprintln(os.Stderr, " The address may be given as host:port for IP-based protocols.")
-	}
+	})
 
-	flag.Parse()
+	getopt.Parse()
 
-	if *pprotos {
+	if help {
+		getopt.Usage()
+		return
+	} else if pprotos {
 		listprotos()
 		return
 	}
 
-	switch narg := flag.NArg(); {
+	args := getopt.Args()
+
+	switch narg := len(args); {
 	case narg > 3 || narg == 0:
-		usage()
+		fmt.Fprintf(os.Stderr, "%s: wrong number of arguments.\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "usage: %s [-h] [options] [protocol] {host port | address}\n", os.Args[0])
+		fmt.Fprintln(os.Stderr, "\n The default protocol is 'tcp'. Use -h to see the options.")
+		fmt.Fprintln(os.Stderr, " The address may be given as host:port for IP-based protocols.")
 		return
 
 	case narg == 3:
-		proto = flag.Arg(0)
-		addr = flag.Arg(1) + ":" + flag.Arg(2)
+		proto = args[0]
+		addr = args[1] + ":" + args[2]
 	case narg == 2:
 		// Try to avoid mistaking not-supported net.Dial protocols
 		// for hostnames.
 		// TODO: do this better. Would it kill the net package
 		// to export some validation routines for us?
-		pt := flag.Arg(0)
+		pt := args[0]
 		if pt == "ip" || pt == "ipv4" || pt == "ipv6" {
 			warnf("protocol %s is not supported\n", pt)
 			return
@@ -637,12 +621,12 @@ func main() {
 		// If arg[0] is a known protocol or arg[1] contains a :
 		// we assume that we have 'proto address'; otherwise we
 		// assume we have a two-argument 'host port' thing.
-		if isknownproto(flag.Arg(0)) || strings.Contains(flag.Arg(1), ":") {
-			proto = flag.Arg(0)
-			addr = flag.Arg(1)
+		if isknownproto(args[0]) || strings.Contains(args[1], ":") {
+			proto = args[0]
+			addr = args[1]
 		} else {
-			proto = guessproto(flag.Arg(1), proto)
-			addr = flag.Arg(0) + ":" + flag.Arg(1)
+			proto = guessproto(args[1], proto)
+			addr = args[0] + ":" + args[1]
 		}
 	case narg == 1:
 		// By extension with the two argument case, we attempt
@@ -653,7 +637,7 @@ func main() {
 		// a TLS-based service, but then you probably want to
 		// be explicit there anyway. Or at least that's my
 		// excuse.
-		addr = flag.Arg(0)
+		addr = args[0]
 		n := strings.LastIndexByte(addr, ':')
 		if n != -1 {
 			proto = guessproto(addr[n+1:], proto)
@@ -666,7 +650,7 @@ func main() {
 		return
 	}
 
-	if *lstn {
+	if lstn {
 		// It is annoying that we have to burn in the knowledge
 		// of what is a packet protocol and what is a stream
 		// protocol. See prior grumbling.

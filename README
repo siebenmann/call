@@ -16,9 +16,9 @@ Go 1.1).
 
 Disclaimer: this is the author's first Go program. It likely shows.
 
-The program has a bunch of comments at the start of call.go to
-describe its usage. However, they are somewhat terse, so here's some
-additional commentary.
+The program has comments at the start of call.go to describe its
+usage. However, they are somewhat terse, so here's some additional
+commentary.
 
 usage: call [args] [proto] {address | host port}
 
@@ -34,8 +34,7 @@ used by Go's net package. Supported protocols:
 	tcp and udp are the generalized versions; they mean to try
 	both IPv4 and IPv6 if possible.
 
-	ssl/tls are TLS without certificate verification
-	sslver/tlsver are TLS with certificate verification
+	ssl/tls are TLS with certificate verification
 
 	unix is (stream) Unix domain sockets; the address is the
 	socket file name.
@@ -64,18 +63,32 @@ protocol or whether or not the second argument contains a ':'.
 === options cross-reference
 
 Usage of ./call:
-  -B=65536: the buffer size for (network) IO; important for 10G Ethernet
-  -C=0: if non-zero, only listen for this many connections then exit
-  -H=false: print received datagrams as hex bytes
-  -P=false: just print our known protocols
-  -R=false: only receive datagrams, do not try to send stdin
-  -T=false: report TLS connection information
-  -b="": make the call from this local address
-  -l=false: listen for connections instead of make them
-  -q=false: be quieter in some situations
-  -v=false: be more verbose in some situations
+ -B, --bufsize=BYTES
+                  Set the buffer size for (network) IO, in bytes. [131072]
+ -b, --local=ADDRESS
+                  Make the call from this local address (can be just an IP or
+                  hostname).
+ -C, --maxconns=COUNT
+                  For -l, only listen for this many connections then exit.
+ -h, --help       Print help.
+ -H, --hex        For -l, print received UDP/Unix datagrams as hex bytes.
+ -I, --insecure   Don't verify the server TLS certificate for TLS connections.
+ -L               For -l, append a newline to the received datagrams if they
+                  lack them.
+ -l, --listen     Listen for connections instead of make them.
+ -N, --crnl       Convert newlines in the input to CR NL.
+ -n, --name=SERVERNAME
+                  The server name for TLS SNI (defaults to the hostname).
+ -P, --protocols  Just print our known protocols.
+ -q, --quiet      Be quieter in some situations.
+ -R, --receive    For -l, only receive datagrams, do not try to send stdin.
+ -t, --timeout=DURATION
+                  Connection timeout for the call if any; use eg '1s' for
+                  seconds.
+ -T, --tlsinfo    Report TLS connection information.
+ -v, --verbose    Be more verbose in some situations.
 
--P preempts (and ignores) all other options.
+-P and -h/--help preempt (and ignore) all other options.
 
 -v makes call report when it has successfully connected to a remote
 server (and what the actual remote address is). This is obviously only
@@ -99,6 +112,7 @@ options as it is.
 -T reports TLS connection information. Currently this includes the
 cipher and the server certificate CommonName (CN). With -v it adds the
 certificate's DNSAltNames if any (which usually includes the CN too).
+A TLS certificate without a CN will report that fact.
 
 === -l oddities
 

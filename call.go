@@ -484,11 +484,11 @@ func tlsinfo(c net.Conn) {
 	}
 }
 
-func call(proto, addr, laddr string, tmout time.Duration) {
+func call(proto, addr, laddr string, tmout time.Duration) error {
 	conn, err := dial(proto, addr, laddr, tmout)
 	if err != nil {
 		warnf("error dialing %s!%s: %s\n", proto, addr, err)
-		return
+		return err
 	}
 	if reporttls {
 		tlsinfo(conn)
@@ -499,6 +499,7 @@ func call(proto, addr, laddr string, tmout time.Duration) {
 	}
 
 	converse(conn, false)
+	return nil
 }
 
 // The need for this function is annoying. The net package should
@@ -670,6 +671,9 @@ func main() {
 		// protocols; net.Dial() makes it all work.
 		// (Don't ask me how unixgram works one way and not the
 		// other.)
-		call(proto, addr, laddr, tmout)
+		err := call(proto, addr, laddr, tmout)
+		if err != nil {
+			os.Exit(1)
+		}
 	}
 }

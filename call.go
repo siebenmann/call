@@ -75,13 +75,13 @@ const DEFAULTNETBUF = (128 * 1024)
 // These should probably be using the log package, or be replaced by it.
 
 // Fprintf to stderr, putting our program name on the front.
-func warnf(format string, elems ...interface{}) {
+func warnf(format string, elems ...any) {
 	fmt.Fprintf(os.Stderr, "call: "+format, elems...)
 }
 
 // Fprintln to stderr, putting our program name on the front.
-func warnln(elems ...interface{}) {
-	e := append([]interface{}{"call:"}, elems...)
+func warnln(elems ...any) {
+	e := append([]any{"call:"}, elems...)
 	fmt.Fprintln(os.Stderr, e...)
 }
 
@@ -369,7 +369,7 @@ func listenpacket(proto, addr string) {
 // ---
 
 // fmt.Println if quiet is not set.
-func nonquiet(elems ...interface{}) {
+func nonquiet(elems ...any) {
 	if !quiet {
 		fmt.Println(elems...)
 	}

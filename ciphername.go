@@ -2,7 +2,6 @@
 // mapping table or the native Go 1.14+ function for this.
 //
 //go:build go1.14
-// +build go1.14
 
 package main
 

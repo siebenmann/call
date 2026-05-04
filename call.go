@@ -460,7 +460,8 @@ func tlsinfo(c net.Conn) {
 		return
 	}
 	cs := tc.ConnectionState()
-	cname := cipherSuiteName(cs.CipherSuite)
+	cname := tls.CipherSuiteName(cs.CipherSuite)
+	ver := tls.VersionName(cs.Version)
 	// there should always be at least one peer certificate.
 	// The first peer certificate is the certificate of the host
 	// itself, which is what we wanted.
@@ -472,7 +473,7 @@ func tlsinfo(c net.Conn) {
 	if cn == "" {
 		cn = "<no CN>"
 	}
-	warnf("TLS to TLS host %s with %s\n", cn, cname)
+	warnf("TLS to TLS host %s with %s:%s\n", cn, ver, cname)
 	// Only report DNS names that are different from the CN, ie
 	// report additional names. We don't check that the CN is
 	// included in DNSNames or anything; we're reporting

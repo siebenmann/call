@@ -1,4 +1,3 @@
-//
 // Call some socket-based server and converse with it, passing stdin to it
 // and writing its output to stdout. We support TCP, Unix sockets, SSL/TLS,
 // and UDP (which may or may not work for you), among other things.
@@ -46,7 +45,6 @@
 // https://github.com/siebenmann/call
 //
 // Copyright: GPL v3
-//
 package main
 
 import (
@@ -91,6 +89,7 @@ func warnln(elems ...interface{}) {
 // Global options
 var quiet bool     // -q
 var verbose bool   // -v
+var discard bool   // -D
 var reporttls bool // -T
 var dgramhex bool  // -H
 var recvonly bool  // -R
@@ -184,7 +183,13 @@ func tonet(remote net.Conn, master chan shutdowns) {
 
 // copy remote to stdout, send writeShutdown to master on end.
 func fromnet(remote net.Conn, master chan shutdowns) {
-	fromto(remote, os.Stdout, "network", "stdout")
+	var dst io.Writer
+	if discard {
+		dst = io.Discard
+	} else {
+		dst = os.Stdout
+	}
+	fromto(remote, dst, "network", "stdout")
 	master <- writeShutdown
 }
 
@@ -237,6 +242,12 @@ func converse(conn net.Conn, server bool) {
 				break
 			} else {
 				nonquiet("<EOF from network>")
+				// If we are a server with -R, shut down
+				// now.
+				if recvonly {
+					_ = shutdownWrite(conn)
+					break
+				}
 			}
 		}
 	}
@@ -534,7 +545,6 @@ func guessproto(port string, defproto string) string {
 	}
 }
 
-//
 // It would be nice if this didn't have to be hardcoded. See above.
 func listprotos() {
 	fmt.Println(`call: known protocols:
@@ -548,8 +558,6 @@ func listprotos() {
  already exist.`)
 }
 
-//
-//
 func main() {
 	proto := "tcp"
 	var addr, laddr string
@@ -560,11 +568,12 @@ func main() {
 	getopt.FlagLong(&pprotos, "protocols", 'P', "Just print our known protocols.")
 	getopt.FlagLong(&quiet, "quiet", 'q', "Be quieter in some situations.")
 	getopt.FlagLong(&verbose, "verbose", 'v', "Be more verbose in some situations.")
+	getopt.FlagLong(&discard, "discard", 'D', "Discard data read from the network instead of sending it to stdout.")
 	getopt.FlagLong(&help, "help", 'h', "Print help.")
 	getopt.FlagLong(&reporttls, "tlsinfo", 'T', "Report TLS connection information.")
 	getopt.FlagLong(&conns, "maxconns", 'C', "For -l, only listen for this many connections then exit.", "COUNT")
 	getopt.FlagLong(&dgramhex, "hex", 'H', "For -l, print received UDP/Unix datagrams as hex bytes.")
-	getopt.FlagLong(&recvonly, "receive", 'R', "For -l, only receive datagrams, do not try to send stdin.")
+	getopt.FlagLong(&recvonly, "receive", 'R', "For -l, only receive datagrams, do not try to send stdin. For stream listens, send stdin but close the entire connection on network EOF.")
 	getopt.FlagLong(&laddr, "local", 'b', "Make the call from this local address (can be just an IP or hostname).", "ADDRESS")
 	bufsize = DEFAULTNETBUF
 	getopt.FlagLong(&bufsize, "bufsize", 'B', "Set the buffer size for (network) IO, in bytes.", "BYTES")

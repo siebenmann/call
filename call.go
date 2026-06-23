@@ -114,11 +114,11 @@ func fromto(src io.Reader, dst io.Writer, imsg, omsg string) {
 	for rerr == nil && werr == nil {
 		var n int
 		n, rerr = src.Read(buf[0:])
-		// It would be really nice if we could catch and
-		// recognize 'use of closed network connection' errors
-		// because, well, THEY AREN'T. Welcome to the land of
-		// goroutines.
-		if rerr != nil && rerr != io.EOF {
+		// If the other side closes the connection on us,
+		// we'll get io.EOF if we're reading from local input
+		// and net.ErrClosed if we're reading from network
+		// input.
+		if rerr != nil && rerr != io.EOF && !errors.Is(rerr, net.ErrClosed) {
 			warnln(imsg, "read error:", rerr)
 		}
 		// if n is 0 this does nothing.

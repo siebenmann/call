@@ -422,7 +422,12 @@ func ResolveAddr(proto, addr string) (net.Addr, error) {
 }
 
 // We accept 'ssl'/'tls' as a protocol; it implies 'tcp' as the underlying
-// protocol.
+// protocol. tls4 and tls6 are specifically TLS with IPv4 or IPv6 only, for
+// diagnosing situations where one fails and the other works. Regular tls
+// (and ssl) use 'tcp', which tries both.
+var tlsmap = map[string]string{"tls": "tcp", "ssl": "tcp",
+	"tls4": "tcp4", "tls6": "tcp6"}
+
 func dial(proto, addr, laddr string, tmout time.Duration) (net.Conn, error) {
 	// Set up our dialer options; we may need a local address and/or
 	// a connection timeout.
@@ -439,7 +444,8 @@ func dial(proto, addr, laddr string, tmout time.Duration) (net.Conn, error) {
 	}
 
 	switch proto {
-	case "ssl", "tls":
+	case "ssl", "tls", "tls4", "tls6":
+		tcpproto := tlsmap[proto]
 		// In 2021, TLS connections should verify server
 		// certificates by default.
 		cfg := tls.Config{}
@@ -449,7 +455,7 @@ func dial(proto, addr, laddr string, tmout time.Duration) (net.Conn, error) {
 		if sniname != "" {
 			cfg.ServerName = sniname
 		}
-		return tls.DialWithDialer(&dialer, "tcp", addr, &cfg)
+		return tls.DialWithDialer(&dialer, tcpproto, addr, &cfg)
 	}
 	return dialer.Dial(proto, addr)
 }
@@ -525,7 +531,7 @@ func isknownproto(s string) bool {
 		// we can't currently support the ip / ipv4 / ipv6
 		// protocol options that Dial et al does.
 
-	case "ssl", "tls":
+	case "ssl", "tls", "tls4", "tls6":
 		// these our our special additions.
 
 	default:
@@ -552,7 +558,7 @@ func listprotos() {
   tcp tcp4 tcp6 unix unixpacket		[stream protocols, more or less]
   udp udp4 udp6 unixgram		[datagram protocols]
 
-  ssl tls		[TLS/SSL with certificate verification]
+  ssl tls tls4 tls6		[TLS/SSL with certificate verification]
 
  TLS/SSL does not support -l. Use -I to disable certificate verification.
  unix* protocols take a filename as their address; for -l, it shouldn't
@@ -668,7 +674,7 @@ func main() {
 		switch proto {
 		case "udp", "udp4", "udp6", "unixgram":
 			listenpacket(proto, addr)
-		case "ssl", "tls":
+		case "ssl", "tls", "tls4", "tls6":
 			// We might as well be friendly.
 			warnf("protocol %s not supported for listening\n",
 				proto)

@@ -99,6 +99,7 @@ var convnl bool    // Convert NL in input to CR NL to the network
 var addnl bool     // Add a newline after records on receive if they lack them.
 var insec bool     // Do not verify TLS certificates
 var sniname string // Server name for TLS connections
+var zeroio bool    // -z, like nc
 
 // ---
 // Stream socket conversation support routines.
@@ -505,7 +506,9 @@ func tlsinfo(c net.Conn) {
 func call(proto, addr, laddr string, tmout time.Duration) error {
 	conn, err := dial(proto, addr, laddr, tmout)
 	if err != nil {
-		warnf("error dialing %s!%s: %s\n", proto, addr, err)
+		if !(quiet && zeroio) {
+			warnf("error dialing %s!%s: %s\n", proto, addr, err)
+		}
 		return err
 	}
 	if reporttls {
@@ -514,6 +517,9 @@ func call(proto, addr, laddr string, tmout time.Duration) error {
 	if verbose {
 		warnf("connected to %s %s (%s):\n", proto, addr,
 			conn.RemoteAddr())
+	}
+	if zeroio {
+		return nil
 	}
 
 	converse(conn, false)
@@ -588,6 +594,7 @@ func main() {
 	getopt.Flag(&addnl, 'L', "For -l, append a newline to the received datagrams if they lack them.")
 	getopt.FlagLong(&insec, "insecure", 'I', "Don't verify the server TLS certificate for TLS connections.")
 	getopt.FlagLong(&sniname, "name", 'n', "The server name for TLS SNI (defaults to the hostname).", "SERVERNAME")
+	getopt.FlagLong(&zeroio, "connect-only", 'z', "Only connect, don't do any IO ('zero-io' mode).")
 
 	// I really wish we could specify a default unit for duration parsing
 	// so people did not have to say '3s' for '3 seconds'.
@@ -664,6 +671,19 @@ func main() {
 	if !isknownproto(proto) {
 		warnf("protocol %s is not recognized and/or supported\n",
 			proto)
+		return
+	}
+
+	if zeroio {
+		switch proto {
+		case "udp", "udp4", "udp6", "unixgram":
+			fmt.Fprintf(os.Stderr, "%s: cannot use -z/--connect-only with datagram protocol '%s'.", os.Args[0], proto)
+			return
+		}
+	}
+	// TODO: figure out what -z with -l should mean.
+	if zeroio && lstn {
+		fmt.Fprintf(os.Stderr, "%s: cannot use -l with -z.", os.Args[0])
 		return
 	}
 

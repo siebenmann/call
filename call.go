@@ -290,9 +290,12 @@ func packetRecv(conn net.PacketConn, master chan net.Addr) {
 			bufStr += "\n"
 		}
 
-		if quiet {
+		switch {
+		case discard:
+			// Print nothing.
+		case quiet:
 			fmt.Printf("%s", bufStr)
-		} else {
+		default:
 			fmt.Printf("%s > %s", addr, bufStr)
 		}
 
